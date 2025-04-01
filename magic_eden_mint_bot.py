@@ -3,12 +3,19 @@ import requests
 from bs4 import BeautifulSoup
 from web3 import Web3
 import re
+from dotenv import load_dotenv
+import os
+import logging
 
-# Konfigurasi
-RPC_URL = "https://testnet-rpc.monad.xyz/"  # RPC Monad Testnet
-PRIVATE_KEY = "YOUR_PRIVATE_KEY_HERE"  # Ganti dengan private key Anda
-WALLET_ADDRESS = "YOUR_WALLET_ADDRESS_HERE"  # Ganti dengan alamat wallet Anda
-MINT_TERMINAL_URL = "https://magiceden.io/mint-terminal/monad-testnet"
+# Setup logging
+logging.basicConfig(level=logging.INFO, filename="mint_bot.log", format="%(asctime)s - %(levelname)s - %(message)s")
+
+# Load environment variables
+load_dotenv()
+RPC_URL = os.getenv("RPC_URL", "https://testnet-rpc.monad.xyz")
+PRIVATE_KEY = os.getenv("PRIVATE_KEY")
+WALLET_ADDRESS = os.getenv("WALLET_ADDRESS")
+MINT_TERMINAL_URL = os.getenv("MINT_TERMINAL_URL", "https://magiceden.io/mint-terminal/monad-testnet")
 
 # ABI generik untuk fungsi mint
 CONTRACT_ABI = [
@@ -24,6 +31,12 @@ CONTRACT_ABI = [
 # Inisialisasi Web3
 w3 = Web3(Web3.HTTPProvider(RPC_URL))
 
+# Verifikasi koneksi
+if not w3.is_connected():
+    logging.error("Koneksi ke RPC gagal!")
+    exit()
+logging.info("Terhubung ke Monad Testnet")
+
 # Fungsi untuk mengambil data dari Mint Terminal
 def fetch_mint_terminal_data():
     headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"}
@@ -32,7 +45,7 @@ def fetch_mint_terminal_data():
         response.raise_for_status()
         return response.text
     except Exception as e:
-        print(f"Gagal mengambil data: {e}")
+        logging.error(f"Gagal mengambil data: {e}")
         return None
 
 # Fungsi untuk mendeteksi harga dan kontrak
@@ -62,12 +75,8 @@ def detect_mint_details(html_content):
 
 # Fungsi untuk mint NFT
 def mint_nft(contract_address, price, quantity=1):
-    if not w3.is_connected():
-        print("Tidak terhubung ke jaringan!")
-        return
-    
     if not contract_address or not w3.is_address(contract_address):
-        print("Alamat kontrak tidak valid!")
+        logging.error("Alamat kontrak tidak valid!")
         return
 
     contract = w3.eth.contract(address=contract_address, abi=CONTRACT_ABI)
@@ -76,7 +85,7 @@ def mint_nft(contract_address, price, quantity=1):
     # Cek saldo
     balance = w3.eth.get_balance(WALLET_ADDRESS)
     if balance < total_cost:
-        print(f"Saldo tidak cukup! Dibutuhkan: {w3.from_wei(total_cost, 'ether')} MON")
+        logging.warning(f"Saldo tidak cukup! Dibutuhkan: {w3.from_wei(total_cost, 'ether')} MON")
         return
 
     # Buat transaksi
@@ -85,27 +94,27 @@ def mint_nft(contract_address, price, quantity=1):
         'to': contract_address,
         'value': total_cost,
         'gas': 300000,
-        'gasPrice': w3.eth.gas_price,
-        'chainId': 1312,  # Chain ID Monad Testnet
+        'gasPrice': int(w3.eth.gas_price * 1.2),
+        'chainId': 1312,
         'data': contract.encodeABI(fn_name="mint", args=[quantity])
     }
 
     try:
         signed_tx = w3.eth.account.sign_transaction(tx, PRIVATE_KEY)
         tx_hash = w3.eth.send_raw_transaction(signed_tx.rawTransaction)
-        print(f"Minting... Hash: {w3.to_hex(tx_hash)}")
+        logging.info(f"Minting... Hash: {w3.to_hex(tx_hash)}")
         
         receipt = w3.eth.wait_for_transaction_receipt(tx_hash, timeout=120)
         if receipt['status'] == 1:
-            print(f"NFT berhasil di-mint! ({quantity} NFT)")
+            logging.info(f"NFT berhasil di-mint! ({quantity} NFT)")
         else:
-            print("Minting gagal!")
+            logging.warning("Minting gagal!")
     except Exception as e:
-        print(f"Error saat minting: {e}")
+        logging.error(f"Error saat minting: {e}")
 
 # Fungsi utama bot
 def run_auto_mint_bot():
-    print("Bot Auto-Minting Magic Eden (Monad Testnet) dimulai...")
+    logging.info("Bot Auto-Minting Magic Eden (Monad Testnet) dimulai...")
     
     while True:
         try:
@@ -113,16 +122,15 @@ def run_auto_mint_bot():
             price, contract_address = detect_mint_details(html_content)
             
             if price is not None and contract_address:
-                print(f"Deteksi: Harga = {price} MON, Kontrak = {contract_address}")
+                logging.info(f"Deteksi: Harga = {price} MON, Kontrak = {contract_address}")
                 mint_nft(contract_address, price, quantity=1)
             else:
-                print("Gagal mendeteksi harga atau kontrak!")
+                logging.warning("Gagal mendeteksi harga atau kontrak!")
             
-            time.sleep(60)  # Cek setiap 60 detik
+            time.sleep(60)
         except Exception as e:
-            print(f"Error di bot: {e}")
-            time.sleep(300)  # Tunggu 5 menit jika error
+            logging.error(f"Error di bot: {e}")
+            time.sleep(300)
 
-# Jalankan bot
 if __name__ == "__main__":
     run_auto_mint_bot()
