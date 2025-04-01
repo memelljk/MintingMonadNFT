@@ -55,9 +55,9 @@ def detect_mint_details(html_content):
     
     soup = BeautifulSoup(html_content, 'html.parser')
     
-    # Deteksi harga mint
+    # Deteksi harga mint (mengganti 'text' dengan 'string')
     price = 0.0
-    price_element = soup.find(text=re.compile(r"\d+\.?\d*\s*MON|FREE", re.I))
+    price_element = soup.find(string=re.compile(r"\d+\.?\d*\s*MON|FREE", re.I))
     if price_element:
         if "FREE" in price_element.upper():
             price = 0.0
