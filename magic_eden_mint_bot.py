@@ -6,7 +6,7 @@ from web3.middleware import geth_poa_middleware
 import re
 
 # Konfigurasi
-RPC_URL = "https://testnet.monad.xyz/rpc"  # RPC Monad Testnet
+RPC_URL = "https://testnet-rpc.monad.xyz/"  # RPC Monad Testnet
 PRIVATE_KEY = "YOUR_PRIVATE_KEY_HERE"  # Ganti dengan private key Anda
 WALLET_ADDRESS = "YOUR_WALLET_ADDRESS_HERE"  # Ganti dengan alamat wallet Anda
 MINT_TERMINAL_URL = "https://magiceden.io/mint-terminal/monad-testnet"
